@@ -1,0 +1,5 @@
+vault = "/absolute/path/to/your/obsidian-vault"
+daily_directory = "daily"
+timezone = "Europe/Rome"
+section_heading = "Hypothesis"
+api_url = "https://hypothes.is/api"

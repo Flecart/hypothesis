@@ -1,0 +1,16 @@
+[project]
+name = "hypothesis-exporter"
+version = "0.1.0"
+description = "Bidirectional synchronization between Hypothesis annotations and Obsidian daily notes"
+requires-python = ">=3.11"
+
+[project.scripts]
+hypothesis-export = "hypothesis_exporter.cli:main"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

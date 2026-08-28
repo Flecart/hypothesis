@@ -1,0 +1,10 @@
+[Unit]
+Description=Synchronize Hypothesis annotations with Obsidian
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/Desktop/work/hypothesis-exporter
+EnvironmentFile=%h/Desktop/work/hypothesis-exporter/.env
+ExecStart=%h/Desktop/work/hypothesis-exporter/hypothesis-export sync --date yesterday
