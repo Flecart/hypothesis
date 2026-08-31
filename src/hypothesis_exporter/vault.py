@@ -32,7 +32,8 @@ def source_key(local_date: str, uri: str) -> str:
 def _candidate_files(vault: Path) -> list[Path]:
     try:
         result = subprocess.run(
-            ["rg", "-l", "--hidden", "-g", "*.md", "-g", "!.obsidian/**", "-g", "!.trash/**",
+            ["rg", "-l", "--hidden", "-g", "*.md", "-g", "!**/.obsidian/**", "-g", "!**/.trash/**",
+             "-g", "!**/.stversions/**",
              "<!-- hypothesis-(entry|source|root):", str(vault)],
             capture_output=True, text=True, check=False,
         )
@@ -42,7 +43,7 @@ def _candidate_files(vault: Path) -> list[Path]:
         pass
     return [
         path for path in vault.rglob("*.md")
-        if ".obsidian" not in path.parts and ".trash" not in path.parts
+        if ".obsidian" not in path.parts and ".trash" not in path.parts and ".stversions" not in path.parts
         and "<!-- hypothesis-" in path.read_text(encoding="utf-8", errors="replace")
     ]
 

@@ -46,3 +46,18 @@ def test_duplicate_entry_is_reported(tmp_path: Path):
     (tmp_path / "two.md").write_text(card, encoding="utf-8")
     found = discover(tmp_path)
     assert any("duplicate annotation abc" in error for error in found.errors)
+
+
+def test_stversions_copies_are_ignored(tmp_path: Path):
+    card = render_entry(annotation())
+    live = tmp_path / "daily" / "2026-08-28.md"
+    version = tmp_path / ".stversions" / "daily" / "2026-08-28.md"
+    live.parent.mkdir()
+    version.parent.mkdir(parents=True)
+    live.write_text(card, encoding="utf-8")
+    version.write_text(card, encoding="utf-8")
+
+    found = discover(tmp_path)
+
+    assert found.errors == []
+    assert found.entries["abc"].path == live.resolve()
