@@ -4,7 +4,7 @@ Description=Daily Hypothesis to Obsidian synchronization
 [Timer]
 OnCalendar=*-*-* 00:05:00
 Persistent=true
-Unit=hypothesis-export.service
+Unit=hypothesis-export-yesterday.service
 
 [Install]
 WantedBy=timers.target

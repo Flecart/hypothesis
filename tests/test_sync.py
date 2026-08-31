@@ -63,12 +63,15 @@ def test_initial_sync_and_local_comment_wins(tmp_path):
         assert "## Hypothesis" in content
         assert "### [Article]" in content
         assert "> Exact highlight" in content
+        assert any(f"create id=ann1 source='Article' file={note}" in message for message in first.messages)
+        assert any(f"write file={note}" in message for message in first.messages)
 
         content = content.replace("Remote note", "Locally categorized thought")
         note.write_text(content)
         second = Synchronizer(config, client, store).sync(date(2026, 8, 28))
         assert second.patched == 1
         assert client.patches == [("ann1", "Locally categorized thought")]
+        assert any("patch id=ann1" in message for message in second.messages)
         assert discover(config.vault).entries["ann1"].comment == "Locally categorized thought"
     finally:
         store.close()

@@ -1,5 +1,5 @@
 [Unit]
-Description=Synchronize today's Hypothesis annotations with Obsidian
+Description=Synchronize yesterday's Hypothesis annotations with Obsidian
 After=network-online.target
 Wants=network-online.target
 
@@ -7,4 +7,5 @@ Wants=network-online.target
 Type=oneshot
 WorkingDirectory=%h/Desktop/work/hypothesis-exporter
 EnvironmentFile=%h/Desktop/work/hypothesis-exporter/.env
-ExecStart=%h/Desktop/work/hypothesis-exporter/hypothesis-export sync
+ExecStart=%h/Desktop/work/hypothesis-exporter/hypothesis-export sync --date yesterday
+

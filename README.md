@@ -30,6 +30,7 @@ Install and enable the supplied units:
 
 ```bash
 install -Dm644 systemd/hypothesis-export.service ~/.config/systemd/user/hypothesis-export.service
+install -Dm644 systemd/hypothesis-export-yesterday.service ~/.config/systemd/user/hypothesis-export-yesterday.service
 install -Dm644 systemd/hypothesis-export.timer ~/.config/systemd/user/hypothesis-export.timer
 systemctl --user daemon-reload
 systemctl --user enable --now hypothesis-export.timer
@@ -42,6 +43,10 @@ The persistent timer runs at 00:05 and synchronizes the previous day. Check it w
 ```bash
 systemctl --user status hypothesis-export.timer
 journalctl --user -u hypothesis-export.service
+journalctl --user -u hypothesis-export-yesterday.service
 ```
+
+For a manual current-day run through systemd, use `systemctl --user start hypothesis-export.service`.
+The timer invokes `hypothesis-export-yesterday.service` separately so manual service runs do not unexpectedly target yesterday.
 
 Obsidian does not need to be open. Runs are serialized, file contents are hash-checked before atomic replacement, and API or marker-validation errors stop the run before vault writes.

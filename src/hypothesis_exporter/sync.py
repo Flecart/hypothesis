@@ -64,6 +64,10 @@ class Synchronizer:
         discovery = discover(self.config.vault, (daily_path,))
         if discovery.errors:
             raise VaultError("\n".join(discovery.errors))
+        result.messages.append(f"target date={day.isoformat()} daily_note={daily_path}")
+        result.messages.append(
+            f"vault discovered_entries={len(discovery.entries)} discovered_sources={len(discovery.sources)}"
+        )
 
         entries = self.store.entries()
         sources = self.store.sources()
@@ -76,6 +80,7 @@ class Synchronizer:
             block = discovery.sources.get(key)
             if source.status == "managed" and block is None:
                 pending_sources[key] = replace(source, status="detached")
+                result.messages.append(f"detach-source key={key} last_file={source.path or '-'} reason=marker-missing")
             elif source.status == "managed" and block is not None:
                 pending_sources[key] = replace(source, path=str(block.path))
         for annotation_id, state in entries.items():
@@ -83,15 +88,30 @@ class Synchronizer:
             if state.status == "managed" and block is None:
                 pending_entries[annotation_id] = replace(state, status="detached")
                 result.detached_entries += 1
+                result.messages.append(
+                    f"detach id={annotation_id} last_file={state.path or '-'} reason=marker-missing"
+                )
             elif state.status == "managed" and block is not None:
                 if state.path and Path(state.path) != block.path:
                     result.moved_entries += 1
+                    result.messages.append(f"move id={annotation_id} from={state.path} to={block.path}")
                 pending_entries[annotation_id] = replace(state, path=str(block.path))
 
         userid = self.client.profile_userid()
         start, end = date_window(day, self.config.timezone)
         selected = self.client.search_created(userid, start, end)
         result.fetched = len(selected)
+        selected_by_source: dict[tuple[str, str], list[str]] = defaultdict(list)
+        for annotation in selected:
+            selected_by_source[(annotation.title, annotation.uri)].append(annotation.id)
+        if selected_by_source:
+            for (title, uri), annotation_ids in selected_by_source.items():
+                result.messages.append(
+                    f"source title={title!r} uri={uri} annotations={len(annotation_ids)} "
+                    f"ids={','.join(annotation_ids)}"
+                )
+        else:
+            result.messages.append("source none")
         remote: dict[str, Annotation | None] = {item.id: item for item in selected}
 
         # Refresh all older, still-managed entries so edits anywhere in the vault sync.
@@ -113,6 +133,7 @@ class Synchronizer:
             if current is None:
                 pending_entries[annotation_id] = replace(state, status="remote_missing", path=str(local.path))
                 result.remote_missing += 1
+                result.messages.append(f"remote-missing id={annotation_id} file={local.path}")
                 continue
             local_text = local.comment or ""
             desired = current
@@ -123,6 +144,10 @@ class Synchronizer:
                     else:
                         desired = current.with_text(local_text)
                     result.patched += 1
+                    verb = "would-patch" if dry_run else "patch"
+                    result.messages.append(
+                        f"{verb} id={annotation_id} file={local.path} field=text reason=local-edit"
+                    )
                 else:
                     desired = current
             rendered = render_entry(desired)
@@ -130,6 +155,9 @@ class Synchronizer:
                 edits.append(FileEdit(local.path, local.start, local.end, rendered))
                 expected_hashes.setdefault(local.path, file_hash(local.path))
                 result.updated_entries += 1
+                result.messages.append(
+                    f"update-card id={annotation_id} file={local.path} reason=remote-or-metadata-change"
+                )
             pending_entries[annotation_id] = EntryState(
                 annotation_id=annotation_id, source_key=state.source_key, created_at=desired.created,
                 base_text=desired.text, remote_updated=desired.updated, status="managed", path=str(local.path),
@@ -171,6 +199,9 @@ class Synchronizer:
                     "managed", str(source_block.path),
                 )
                 result.created_entries += 1
+                result.messages.append(
+                    f"create id={annotation.id} source={annotation.title!r} file={source_block.path}"
+                )
 
         # Create new publication sections in the target daily note.
         if new_by_new_source:
@@ -188,6 +219,9 @@ class Synchronizer:
                         "managed", str(daily_path),
                     )
                     result.created_entries += 1
+                    result.messages.append(
+                        f"create id={annotation.id} source={annotation.title!r} file={daily_path}"
+                    )
             root = discovery.roots.get(daily_path)
             if root:
                 insertion = root.end - len(ROOT_END)
@@ -198,6 +232,15 @@ class Synchronizer:
                                       prefix + render_root(self.config.section_heading, rendered_sources) + "\n"))
             expected_hashes.setdefault(daily_path, file_hash(daily_path))
 
+        edits_by_file: dict[Path, int] = defaultdict(int)
+        for edit in edits:
+            edits_by_file[edit.path] += 1
+        if edits_by_file:
+            verb = "would-write" if dry_run else "write"
+            for path, count in edits_by_file.items():
+                result.messages.append(f"{verb} file={path} edits={count}")
+        else:
+            result.messages.append("write none")
         result.written_files = apply_edits(edits, expected_hashes, dry_run=dry_run)
         if not dry_run:
             with self.store.transaction():
