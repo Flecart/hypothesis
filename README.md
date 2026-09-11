@@ -20,9 +20,12 @@ The project launcher loads `APP_TOKEN` from the process environment or the local
 ./hypothesis-export sync
 ./hypothesis-export sync --date yesterday
 ./hypothesis-export sync --date 2026-08-28
+./hypothesis-export sync --since 2026-08-28
 ./hypothesis-export sync --dry-run
 ./hypothesis-export status
 ```
+
+`--since` synchronizes every date from the supplied date through today, inclusive. Each day is committed independently, so an interrupted range can be rerun safely and already completed dates remain idempotent. `--since` and `--date` are mutually exclusive, and `--dry-run` works with either mode.
 
 Copy `config.example.toml` to `config.toml` and set the absolute path to your vault. The local configuration is ignored by Git. SQLite state is stored by default at `~/.local/state/hypothesis-exporter/state.sqlite3` and is not placed in the vault.
 

@@ -19,8 +19,8 @@ def _project_config() -> Path:
     return Path(__file__).resolve().parents[2] / "config.toml"
 
 
-def _parse_date(value: str, timezone_name: str) -> date:
-    today = __import__("datetime").datetime.now(ZoneInfo(timezone_name)).date()
+def _parse_date(value: str, timezone_name: str, *, today: date | None = None) -> date:
+    today = today or __import__("datetime").datetime.now(ZoneInfo(timezone_name)).date()
     if value == "today":
         return today
     if value == "yesterday":
@@ -28,7 +28,18 @@ def _parse_date(value: str, timezone_name: str) -> date:
     try:
         return date.fromisoformat(value)
     except ValueError as exc:
-        raise argparse.ArgumentTypeError("date must be today, yesterday, or YYYY-MM-DD") from exc
+        raise RuntimeError("date must be today, yesterday, or YYYY-MM-DD") from exc
+
+
+def _sync_dates(date_value: str | None, since_value: str | None, timezone_name: str,
+                *, today: date | None = None) -> list[date]:
+    today = today or __import__("datetime").datetime.now(ZoneInfo(timezone_name)).date()
+    if since_value is None:
+        return [_parse_date(date_value or "today", timezone_name, today=today)]
+    start = _parse_date(since_value, timezone_name, today=today)
+    if start > today:
+        raise RuntimeError("--since cannot be later than today")
+    return [start + timedelta(days=offset) for offset in range((today - start).days + 1)]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -36,7 +47,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--config", type=Path, default=_project_config())
     subparsers = parser.add_subparsers(dest="command", required=True)
     sync = subparsers.add_parser("sync", help="synchronize Hypothesis and Obsidian")
-    sync.add_argument("--date", default="today", help="today, yesterday, or YYYY-MM-DD")
+    date_group = sync.add_mutually_exclusive_group()
+    date_group.add_argument("--date", help="one date: today, yesterday, or YYYY-MM-DD")
+    date_group.add_argument("--since", help="first date to sync through today, inclusive")
     sync.add_argument("--dry-run", action="store_true")
     subparsers.add_parser("status", help="show synchronization and marker status")
     return parser
@@ -72,10 +85,16 @@ def main(argv: list[str] | None = None) -> int:
             token = os.environ.get("APP_TOKEN")
             if not token:
                 raise RuntimeError("APP_TOKEN is not set")
-            day = _parse_date(args.date, config.timezone)
             client = HypothesisClient(config.api_url, token)
-            result = Synchronizer(config, client, store).sync(day, dry_run=args.dry_run)
-            _print_result(result, args.dry_run)
+            days = _sync_dates(args.date, args.since, config.timezone)
+            synchronizer = Synchronizer(config, client, store)
+            for index, day in enumerate(days):
+                if len(days) > 1:
+                    print(f"=== sync {day.isoformat()} ({index + 1}/{len(days)}) ===")
+                result = synchronizer.sync(day, dry_run=args.dry_run)
+                _print_result(result, args.dry_run)
+            if len(days) > 1:
+                print(f"range-complete since={days[0].isoformat()} through={days[-1].isoformat()} days={len(days)}")
             return 0
         finally:
             store.close()
