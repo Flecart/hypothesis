@@ -1,7 +1,12 @@
 from pathlib import Path
 
 from hypothesis_exporter.models import Annotation
-from hypothesis_exporter.vault import discover, render_entry, render_root, render_source, source_key
+import pytest
+
+from hypothesis_exporter.vault import (
+    VaultError, discover, render_entry, render_root, render_source,
+    resolve_note_by_basename, source_key,
+)
 
 
 def annotation(identifier: str = "abc", text: str = "My note") -> Annotation:
@@ -61,3 +66,34 @@ def test_stversions_copies_are_ignored(tmp_path: Path):
 
     assert found.errors == []
     assert found.entries["abc"].path == live.resolve()
+
+
+def test_resolve_note_by_basename_finds_moved_note(tmp_path: Path):
+    moved = tmp_path / "daily" / "08" / "2026-08-28.md"
+    moved.parent.mkdir(parents=True)
+    moved.write_text("#diary\n", encoding="utf-8")
+
+    resolved = resolve_note_by_basename(tmp_path, tmp_path / "daily", "2026-08-28.md")
+
+    assert resolved == moved.resolve()
+
+
+def test_resolve_note_by_basename_ignores_versions_and_rejects_live_duplicates(tmp_path: Path):
+    live = tmp_path / "daily" / "2026-08-28.md"
+    version = tmp_path / ".stversions" / "daily" / "2026-08-28.md"
+    live.parent.mkdir()
+    version.parent.mkdir(parents=True)
+    live.write_text("#diary\n", encoding="utf-8")
+    version.write_text("#diary\n", encoding="utf-8")
+    assert resolve_note_by_basename(tmp_path, tmp_path / "daily", live.name) == live.resolve()
+
+    duplicate = tmp_path / "archive" / live.name
+    duplicate.parent.mkdir()
+    duplicate.write_text("#diary\n", encoding="utf-8")
+    with pytest.raises(VaultError, match="multiple vault notes"):
+        resolve_note_by_basename(tmp_path, tmp_path / "daily", live.name)
+
+
+def test_resolve_note_by_basename_returns_new_daily_path(tmp_path: Path):
+    expected = tmp_path / "daily" / "2026-08-28.md"
+    assert resolve_note_by_basename(tmp_path, tmp_path / "daily", expected.name) == expected.resolve()

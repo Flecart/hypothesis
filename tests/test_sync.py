@@ -77,6 +77,25 @@ def test_initial_sync_and_local_comment_wins(tmp_path):
         store.close()
 
 
+def test_initial_sync_uses_existing_date_note_anywhere_in_vault(tmp_path):
+    config = make_config(tmp_path)
+    moved_note = config.vault / "daily" / "08" / "2026-08-28.md"
+    moved_note.parent.mkdir(parents=True)
+    moved_note.write_text("#diary\n\nExisting content\n", encoding="utf-8")
+    client = FakeClient([make_annotation()])
+    store = StateStore(config.state_path)
+    try:
+        result = Synchronizer(config, client, store).sync(date(2026, 8, 28))
+
+        assert result.created_entries == 1
+        assert "Existing content" in moved_note.read_text(encoding="utf-8")
+        assert "## Hypothesis" in moved_note.read_text(encoding="utf-8")
+        assert not (config.daily_dir / "2026-08-28.md").exists()
+        assert any(f"daily_note={moved_note.resolve()} resolution=existing" in message for message in result.messages)
+    finally:
+        store.close()
+
+
 def test_moved_card_continues_syncing(tmp_path):
     config = make_config(tmp_path)
     client = FakeClient([make_annotation()])

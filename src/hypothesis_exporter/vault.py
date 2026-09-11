@@ -19,10 +19,26 @@ SOURCE_START = re.compile(r"<!-- hypothesis-source:start key=([0-9a-f]{32}) -->"
 SOURCE_END_TEMPLATE = "<!-- hypothesis-source:end key={key} -->"
 ROOT_START = "<!-- hypothesis-root:start -->"
 ROOT_END = "<!-- hypothesis-root:end -->"
+IGNORED_VAULT_DIRECTORIES = frozenset({".git", ".obsidian", ".stversions", ".trash"})
 
 
 class VaultError(RuntimeError):
     pass
+
+
+def resolve_note_by_basename(vault: Path, fallback_directory: Path, filename: str) -> Path:
+    """Find a unique note anywhere in the vault, or return its configured new path."""
+    matches = sorted({
+        path.resolve()
+        for path in vault.rglob(filename)
+        if not IGNORED_VAULT_DIRECTORIES.intersection(path.relative_to(vault).parts)
+    })
+    if len(matches) > 1:
+        locations = ", ".join(str(path) for path in matches)
+        raise VaultError(f"multiple vault notes named {filename}: {locations}")
+    if matches:
+        return matches[0]
+    return (fallback_directory / filename).resolve()
 
 
 def source_key(local_date: str, uri: str) -> str:
@@ -43,7 +59,7 @@ def _candidate_files(vault: Path) -> list[Path]:
         pass
     return [
         path for path in vault.rglob("*.md")
-        if ".obsidian" not in path.parts and ".trash" not in path.parts and ".stversions" not in path.parts
+        if not IGNORED_VAULT_DIRECTORIES.intersection(path.relative_to(vault).parts)
         and "<!-- hypothesis-" in path.read_text(encoding="utf-8", errors="replace")
     ]
 

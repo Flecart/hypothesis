@@ -13,7 +13,7 @@ from .models import Annotation, EntryState, FileEdit, SourceState, SyncResult
 from .state import StateStore
 from .vault import (
     ROOT_END, SOURCE_END_TEMPLATE, VaultError, apply_edits, discover, file_hash,
-    render_entry, render_root, render_source, source_key,
+    render_entry, render_root, render_source, resolve_note_by_basename, source_key,
 )
 
 
@@ -60,11 +60,16 @@ class Synchronizer:
             lock_handle.close()
 
     def _sync_locked(self, day: date, *, dry_run: bool, result: SyncResult) -> SyncResult:
-        daily_path = (self.config.daily_dir / f"{day.isoformat()}.md").resolve()
+        daily_path = resolve_note_by_basename(
+            self.config.vault, self.config.daily_dir, f"{day.isoformat()}.md"
+        )
+        daily_note_resolution = "existing" if daily_path.exists() else "new"
         discovery = discover(self.config.vault, (daily_path,))
         if discovery.errors:
             raise VaultError("\n".join(discovery.errors))
-        result.messages.append(f"target date={day.isoformat()} daily_note={daily_path}")
+        result.messages.append(
+            f"target date={day.isoformat()} daily_note={daily_path} resolution={daily_note_resolution}"
+        )
         result.messages.append(
             f"vault discovered_entries={len(discovery.entries)} discovered_sources={len(discovery.sources)}"
         )

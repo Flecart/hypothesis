@@ -6,6 +6,8 @@ Bidirectional synchronization between your Hypothesis annotations and Obsidian d
 
 Annotations initially appear under `## Hypothesis` and a `### [Publication](URL)` heading. Each annotation is enclosed by invisible `hypothesis-entry` markers. Move the entire marker-delimited card to categorize it elsewhere in the vault; the next run finds it and continues synchronizing its personal annotation in place. Moving an entire marker-delimited publication section also makes later annotations for that source/date follow it.
 
+Before writing a date, the exporter searches the entire vault for a unique `YYYY-MM-DD.md` basename. It uses that note wherever it has been moved. If no matching note exists, it creates one under the configured `daily_directory`. Multiple live notes with the same basename are treated as ambiguous and stop the run safely; `.git`, `.obsidian`, `.stversions`, and `.trash` are ignored.
+
 Only the personal annotation between `hypothesis-comment` markers is editable in both directions. The exact highlighted quote and generated metadata are owned by Hypothesis. Text surrounding a card is Obsidian-only and is preserved.
 
 Do not copy marker-delimited cards. Duplicate IDs are ambiguous and cause synchronization to stop safely. Removing a card everywhere detaches it locally and never deletes the Hypothesis annotation.
